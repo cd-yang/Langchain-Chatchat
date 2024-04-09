@@ -177,4 +177,5 @@ cython_debug/
 test.py
 configs/*.py
 
-
+# python embed 环境
+python3.11.9/

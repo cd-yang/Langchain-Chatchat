@@ -1,5 +1,8 @@
 import os
 
+# 默认不使用 LLM 对知识库检索的结果进行总结
+ENABLE_LLM = False
+
 # 默认使用的知识库
 DEFAULT_KNOWLEDGE_BASE = "samples"
 

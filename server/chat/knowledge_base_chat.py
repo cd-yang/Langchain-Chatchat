@@ -9,6 +9,11 @@ from configs import (LLM_MODELS,
                      RERANKER_MODEL,
                      RERANKER_MAX_LENGTH,
                      MODEL_PATH)
+try:
+    import ENABLE_LLM
+except ImportError:
+    ENABLE_LLM = False
+
 from server.utils import wrap_done, get_ChatOpenAI
 from server.utils import BaseResponse, get_prompt_template
 from langchain.chains import LLMChain
@@ -67,22 +72,26 @@ async def knowledge_base_chat(query: str = Body(..., description="用户输入",
             model_name: str = model_name,
             prompt_name: str = prompt_name,
     ) -> AsyncIterable[str]:
+        print("*****************knowledge_base_chat_iterator begin")
         nonlocal max_tokens
         callback = AsyncIteratorCallbackHandler()
         if isinstance(max_tokens, int) and max_tokens <= 0:
             max_tokens = None
 
-        model = get_ChatOpenAI(
-            model_name=model_name,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            callbacks=[callback],
-        )
+        if ENABLE_LLM:
+            model = get_ChatOpenAI(
+                model_name=model_name,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                callbacks=[callback],
+            )
+
         docs = await run_in_threadpool(search_docs,
                                        query=query,
                                        knowledge_base_name=knowledge_base_name,
                                        top_k=top_k,
                                        score_threshold=score_threshold)
+        print("***************** end search_docs")
 
         # 加入reranker
         if USE_RERANKER:
@@ -105,17 +114,19 @@ async def knowledge_base_chat(query: str = Body(..., description="用户输入",
             prompt_template = get_prompt_template("knowledge_base_chat", "empty")
         else:
             prompt_template = get_prompt_template("knowledge_base_chat", prompt_name)
-        input_msg = History(role="user", content=prompt_template).to_msg_template(False)
-        chat_prompt = ChatPromptTemplate.from_messages(
-            [i.to_msg_template() for i in history] + [input_msg])
 
-        chain = LLMChain(prompt=chat_prompt, llm=model)
+        if ENABLE_LLM:
+            input_msg = History(role="user", content=prompt_template).to_msg_template(False)
+            chat_prompt = ChatPromptTemplate.from_messages(
+                [i.to_msg_template() for i in history] + [input_msg])
 
-        # Begin a task that runs in the background.
-        task = asyncio.create_task(wrap_done(
-            chain.acall({"context": context, "question": query}),
-            callback.done),
-        )
+            chain = LLMChain(prompt=chat_prompt, llm=model)
+
+            # Begin a task that runs in the background.
+            task = asyncio.create_task(wrap_done(
+                chain.acall({"context": context, "question": query}),
+                callback.done),
+            )
 
         source_documents = []
         for inum, doc in enumerate(docs):
@@ -129,19 +140,25 @@ async def knowledge_base_chat(query: str = Body(..., description="用户输入",
         if len(source_documents) == 0:  # 没有找到相关文档
             source_documents.append(f"<span style='color:red'>未找到相关文档,该回答为大模型自身能力解答！</span>")
 
-        if stream:
-            async for token in callback.aiter():
-                # Use server-sent-events to stream the response
-                yield json.dumps({"answer": token}, ensure_ascii=False)
-            yield json.dumps({"docs": source_documents}, ensure_ascii=False)
-        else:
-            answer = ""
-            async for token in callback.aiter():
-                answer += token
-            yield json.dumps({"answer": answer,
+        if not ENABLE_LLM:
+            yield json.dumps({"answer": "查找到以下相关文档，如需查看更多文档，请调整“匹配知识条数”参数",
                               "docs": source_documents},
                              ensure_ascii=False)
-        await task
+        
+        else:
+            if stream:
+                async for token in callback.aiter():
+                    # Use server-sent-events to stream the response
+                    yield json.dumps({"answer": token}, ensure_ascii=False)
+                yield json.dumps({"docs": source_documents}, ensure_ascii=False)
+            else:
+                answer = ""
+                async for token in callback.aiter():
+                    answer += token
+                yield json.dumps({"answer": answer,
+                                "docs": source_documents},
+                                ensure_ascii=False)
+            await task
 
     return EventSourceResponse(knowledge_base_chat_iterator(query, top_k, history,model_name,prompt_name))
 

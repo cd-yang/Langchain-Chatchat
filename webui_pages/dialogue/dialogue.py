@@ -143,7 +143,7 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
                           ]
         dialogue_mode = st.selectbox("请选择对话模式：",
                                      dialogue_modes,
-                                     index=0,
+                                     index=1, # 默认知识库问答
                                      on_change=on_mode_change,
                                      key="dialogue_mode",
                                      )
@@ -367,7 +367,7 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
             elif dialogue_mode == "知识库问答":
                 chat_box.ai_say([
                     f"正在查询知识库 `{selected_kb}` ...",
-                    Markdown("...", in_expander=True, title="知识库匹配结果", state="complete"),
+                    Markdown("...", in_expander=True, expanded=True, title="知识库匹配结果", state="complete"),
                 ])
                 text = ""
                 for d in api.knowledge_base_chat(prompt,

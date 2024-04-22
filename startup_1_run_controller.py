@@ -606,7 +606,6 @@ def dump_server_info(after_start=False, args=None):
 
 
 def start_main_server():
-    print('1')
     # import time
     # import signal
 
@@ -660,7 +659,6 @@ def start_main_server():
     #     run_mode = "lite"
 
     # dump_server_info(args=args)
-    print('2')
 
     if len(sys.argv) > 1:
         logger.info(f"正在启动服务：")

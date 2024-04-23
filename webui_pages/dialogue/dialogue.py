@@ -370,6 +370,7 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
                     Markdown("...", in_expander=True, expanded=True, title="知识库匹配结果", state="complete"),
                 ])
                 text = ""
+                docs_updated = False
                 for d in api.knowledge_base_chat(prompt,
                                                  knowledge_base_name=selected_kb,
                                                  top_k=kb_top_k,
@@ -378,13 +379,17 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
                                                  model=llm_model,
                                                  prompt_name=prompt_template_name,
                                                  temperature=temperature):
+                    if not docs_updated:
+                        chat_box.update_msg("\n\n".join(d.get("docs", [])), element_index=1, streaming=False)
+                        docs_updated = True
                     if error_msg := check_error_msg(d):  # check whether error occured
                         st.error(error_msg)
                     elif chunk := d.get("answer"):
                         text += chunk
                         chat_box.update_msg(text, element_index=0)
                 chat_box.update_msg(text, element_index=0, streaming=False)
-                chat_box.update_msg("\n\n".join(d.get("docs", [])), element_index=1, streaming=False)
+                if not docs_updated:
+                    chat_box.update_msg("\n\n".join(d.get("docs", [])), element_index=1, streaming=False)
             elif dialogue_mode == "文件对话":
                 if st.session_state["file_chat_id"] is None:
                     st.error("请先上传文件再进行对话")

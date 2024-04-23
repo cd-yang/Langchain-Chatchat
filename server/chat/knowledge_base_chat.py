@@ -10,7 +10,7 @@ from configs import (LLM_MODELS,
                      RERANKER_MAX_LENGTH,
                      MODEL_PATH)
 try:
-    import ENABLE_LLM
+    from configs import ENABLE_LLM
 except ImportError:
     ENABLE_LLM = False
 
@@ -144,8 +144,10 @@ async def knowledge_base_chat(query: str = Body(..., description="用户输入",
             yield json.dumps({"answer": "查找到以下相关文档，如需查看更多文档，请调整“匹配知识条数”参数",
                               "docs": source_documents},
                              ensure_ascii=False)
-        
         else:
+            yield json.dumps({"docs": source_documents}, ensure_ascii=False)
+
+        if ENABLE_LLM:
             if stream:
                 async for token in callback.aiter():
                     # Use server-sent-events to stream the response
